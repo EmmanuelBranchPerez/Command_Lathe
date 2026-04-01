@@ -24,6 +24,7 @@
 #include "string.h"
 #include "stdio.h"
 #include "stdlib.h"
+#include "stepper.h" //Stepper's header file
 
 /* USER CODE END Includes */
 
@@ -61,7 +62,8 @@ static void MX_TIM11_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM5_Init(void);
 /* USER CODE BEGIN PFP */
-
+MoveResult MoveSteps(int32_t milimeters); //We receivieng the actual position in the display
+void StepperOn(void); //Function that makes the stepper turn on
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -166,7 +168,7 @@ static void MX_TIM2_Init(void)
 {
 
   /* USER CODE BEGIN TIM2_Init 0 */
-  // This timer is used for generating both of the PWM's f the STEP
+	// This timer is used for generating both of the PWM's f the STEP
   /* USER CODE END TIM2_Init 0 */
 
   TIM_MasterConfigTypeDef sMasterConfig = {0};
@@ -341,9 +343,13 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(Blinky_GPIO_Port, Blinky_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(ENA4988_1_GPIO_Port, ENA4988_1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : Blinky_Pin */
   GPIO_InitStruct.Pin = Blinky_Pin;
@@ -352,11 +358,156 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(Blinky_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : ENA4988_1_Pin */
+  GPIO_InitStruct.Pin = ENA4988_1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(ENA4988_1_GPIO_Port, &GPIO_InitStruct);
+
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
+/* ─────────────────────────────────────────────
+   StepperEnable / StepperDisable
+   A4988 EN pin is active-LOW on most boards.
+   Adjust polarity if yours differs.
+───────────────────────────────────────────── */
+void StepperEnable(void)
+{
+	/* Active LOW: pull EN low to enable driver */
+	HAL_GPIO_WritePin(ENA4988_1_GPIO_Port, ENA4988_1_Pin, GPIO_PIN_RESET);
+}
+
+void StepperDisable(void)
+{
+	HAL_GPIO_WritePin(ENA4988_1_GPIO_Port, ENA4988_1_Pin, GPIO_PIN_SET);
+}
+
+/* ─────────────────────────────────────────────
+   MoveSteps
+   milimeters > 0  →  forward  (encoder counts UP,   DIR = HIGH)
+   milimeters < 0  →  backward (encoder counts DOWN,  DIR = LOW )
+   milimeters = 0  →  MOVE_ERR_INVALID
+
+   Returns MoveResult so the caller can react.
+───────────────────────────────────────────── */
+MoveResult MoveSteps(int32_t milimeters)
+{
+	/* ── 0. Reject zero movement ─────────────────────── */
+	if (milimeters == 0) {
+		return MOVE_ERR_INVALID;
+	}
+
+	/* ── 1. Convert mm → encoder counts (signed) ─────── */
+	int32_t delta_counts = (int32_t)(milimeters * COUNTS_PER_MM);
+	//  NOTE: fractional truncation here is intentional.
+	//  At 23.66 counts/mm the rounding error is < 1 count (< 0.05 mm).
+	//  If sub-count precision is needed later, accumulate remainder.
+
+	/* ── 2. Read current encoder position ────────────── */
+	int32_t act_counter = (int32_t)__HAL_TIM_GET_COUNTER(&htim5);
+
+	/* ── 3. Compute intended target position ─────────── */
+	int32_t target_counter = act_counter + delta_counts;
+
+	/* ── 4. Security: check target against hard limits ── */
+	//  We check the TARGET, not act_counter, so we catch over-travel
+	//  before the motor even starts moving.
+	if (target_counter > (int32_t)LIMIT_UPPER) {
+		return MOVE_ERR_UPPER_LIMIT;   /* hard stop – motor never starts */
+	}
+	if (target_counter < (int32_t)LIMIT_LOWER) {
+		return MOVE_ERR_LOWER_LIMIT;
+	}
+
+	/* ── 5. Set direction pin ────────────────────────── */
+	if (milimeters > 0) {
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);   /* Forward */
+	} else {
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET); /* Backward */
+	}
+
+	/* ── 6. Enable driver and start PWM ─────────────── */
+	StepperEnable();
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+
+	/* ── 7. Poll encoder until target reached ────────── */
+	//  We re-read the encoder every loop iteration.
+	//  The motor pulses itself via PWM — we just watch.
+	while (1)
+	{
+		act_counter = (int32_t)__HAL_TIM_GET_COUNTER(&htim5);
+
+		/* ── 7a. In-motion limit safety re-check ──────
+           Guards against mechanical slip or missed counts
+           pushing us past the limit mid-move.             */
+		if (act_counter >= (int32_t)LIMIT_UPPER) {
+			HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+			StepperDisable();
+			return MOVE_ERR_UPPER_LIMIT;
+		}
+		if (act_counter <= (int32_t)LIMIT_LOWER) {
+			HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+			StepperDisable();
+			return MOVE_ERR_LOWER_LIMIT;
+		}
+
+		/* ── 7b. Target reached? ───────────────────── */
+		int8_t reached;
+		if (milimeters > 0) {
+			reached = (act_counter >= target_counter);
+		} else {
+			reached = (act_counter <= target_counter);
+		}
+
+		if (reached) {
+			break;
+		}
+	}
+
+	/* ── 8. Stop PWM and disable driver ─────────────── */
+	HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
+	StepperDisable();
+
+	return MOVE_OK;
+}
+
+////Stepper movement
+//void StepperOn(void){
+//	HAL_GPIO_WritePin(ENA4988_1_GPIO_Port, ENA4988_1_Pin, GPIO_PIN_SET);//Put 1 in the EN pin
+//}
+////Longitudinal and transversal cars depend on the steppe's movement
+////This movement is parameterize with a number 23.66 --- for review
+//uint32_t grLimit = 1250; //Maximum limit, this will be set when using the specific end of career's in both limit's
+//uint32_t loLimit = 0; //Minimum limit, this will be set when using the specific end of career's in both limit's
+//void MoveSteps(uint32_t milimeters, uint8_t direction){
+//	int32_t pulses; //signed integer as we're going to use both negative and positive number's
+//	pulses =  23.66*milimeters; //Convert to a unit the timer knows
+//	//Problems her, as we need an  int number for the number of pulses we should check what we can do
+//	//with the conversion since it can affect the precision of the system
+//	uint32_t act_counter = __HAL_TIM_GET_COUNTER(&htim5); //Get the counter of the timer relate to the encoder
+//
+//	//Each count of the counter is the amount of pulses the encoder has identified
+//	uint32_t mov_counter = act_counter + pulses;
+//
+//	//Security check movement
+//	if (mov_counter > grLimit){
+//		return;
+//	}
+//
+//	if (mov_counter > loLimit){
+//		return;
+//	}
+//while(act_counter < mov_counter){
+//	StepperOn();
+//
+//	//Securityuserfunctions: Check zeros, check limits...
+//}
+//
+//}
 
 
 
