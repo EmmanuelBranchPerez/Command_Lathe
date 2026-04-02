@@ -29,4 +29,3 @@ void       StepperDisable(void);
 MoveResult MoveSteps     (int32_t milimeters);
 
 #endif /* STEPPER_H */
-
