@@ -52,7 +52,9 @@ UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
-
+int32_t act_counter = 0;
+int8_t once = 0;
+MoveResult result = IDLE_STATE;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -112,8 +114,37 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  once = 1;
+
 	while (1)
 	{
+		if(once){
+			result = MoveSteps(100);     /* move +25 mm forward  */
+		}
+
+		switch (result) {
+
+			case IDLE_STATE:
+			    printf("IDLE_STATE \r\n");
+			    break;
+		    case MOVE_OK:
+		    	once = 0;
+		        printf("Move complete.\r\n");
+		        result = IDLE_STATE;
+		        break;
+		    case MOVE_ERR_UPPER_LIMIT:
+		    	once = 0;
+		        printf("ERROR: Upper limit reached. Reconfigure position.\r\n");
+		        break;
+		    case MOVE_ERR_LOWER_LIMIT:
+		    	once = 0;
+		        printf("ERROR: Lower limit reached. Reconfigure position.\r\n");
+		        break;
+		    case MOVE_ERR_INVALID:
+		    	once = 0;
+		        printf("ERROR: Invalid movement (0 mm).\r\n");
+		        break;
+		}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -211,6 +242,7 @@ static void MX_TIM2_Init(void)
   /* USER CODE BEGIN TIM2_Init 2 */
 	HAL_TIM_Base_Init(&htim2);
 	HAL_TIM_PWM_Init(&htim2);
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1); //We begin the CH1 PWM
   /* USER CODE END TIM2_Init 2 */
   HAL_TIM_MspPostInit(&htim2);
 
@@ -359,14 +391,20 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(Blinky_GPIO_Port, Blinky_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(ENA4988_1_GPIO_Port, ENA4988_1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, MS2_Pin|MS1_Pin|ENA4988_1_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(DIR_GPIO_Port, DIR_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(MS3_GPIO_Port, MS3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : Blinky_Pin */
   GPIO_InitStruct.Pin = Blinky_Pin;
@@ -375,12 +413,26 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(Blinky_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : ENA4988_1_Pin */
-  GPIO_InitStruct.Pin = ENA4988_1_Pin;
+  /*Configure GPIO pins : MS2_Pin MS1_Pin ENA4988_1_Pin */
+  GPIO_InitStruct.Pin = MS2_Pin|MS1_Pin|ENA4988_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(ENA4988_1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : DIR_Pin */
+  GPIO_InitStruct.Pin = DIR_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(DIR_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : MS3_Pin */
+  GPIO_InitStruct.Pin = MS3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(MS3_GPIO_Port, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
