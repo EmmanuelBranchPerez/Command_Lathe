@@ -7,7 +7,7 @@
   ******************************************************************************
   * @attention
   *
-  * Copyright (c) 2025 STMicroelectronics.
+  * Copyright (c) 2026 STMicroelectronics.
   * All rights reserved.
   *
   * This software is licensed under terms that can be found in the LICENSE file
@@ -61,34 +61,22 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define Blinky_Pin GPIO_PIN_1
 #define Blinky_GPIO_Port GPIOH
-#define FC2_Pin GPIO_PIN_1
-#define FC2_GPIO_Port GPIOC
-#define FC2_EXTI_IRQn EXTI1_IRQn
-#define FC3_Pin GPIO_PIN_2
-#define FC3_GPIO_Port GPIOC
-#define FC3_EXTI_IRQn EXTI2_IRQn
-#define FC4_Pin GPIO_PIN_3
-#define FC4_GPIO_Port GPIOC
-#define FC4_EXTI_IRQn EXTI3_IRQn
 #define USART_TX_Pin GPIO_PIN_2
 #define USART_TX_GPIO_Port GPIOA
 #define USART_RX_Pin GPIO_PIN_3
 #define USART_RX_GPIO_Port GPIOA
+#define PWMA4988_Pin GPIO_PIN_5
+#define PWMA4988_GPIO_Port GPIOA
 #define MS2_Pin GPIO_PIN_5
 #define MS2_GPIO_Port GPIOC
+#define PWMA4988B10_Pin GPIO_PIN_10
+#define PWMA4988B10_GPIO_Port GPIOB
 #define DIR_Pin GPIO_PIN_12
 #define DIR_GPIO_Port GPIOB
-#define SET_ZERO_H_Pin GPIO_PIN_13
-#define SET_ZERO_H_GPIO_Port GPIOB
-#define SET_ZERO_H_EXTI_IRQn EXTI15_10_IRQn
-#define FC1_Pin GPIO_PIN_14
-#define FC1_GPIO_Port GPIOB
-#define FC1_EXTI_IRQn EXTI15_10_IRQn
-#define SET_ZERO_L_Pin GPIO_PIN_15
-#define SET_ZERO_L_GPIO_Port GPIOB
-#define SET_ZERO_L_EXTI_IRQn EXTI15_10_IRQn
 #define MS1_Pin GPIO_PIN_6
 #define MS1_GPIO_Port GPIOC
+#define ENA4988_1_Pin GPIO_PIN_8
+#define ENA4988_1_GPIO_Port GPIOC
 #define MS3_Pin GPIO_PIN_11
 #define MS3_GPIO_Port GPIOA
 #define TMS_Pin GPIO_PIN_13
@@ -107,4 +95,3 @@ void Error_Handler(void);
 #endif
 
 #endif /* __MAIN_H */
-

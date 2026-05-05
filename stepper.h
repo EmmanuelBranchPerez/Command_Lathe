@@ -9,18 +9,19 @@ extern TIM_HandleTypeDef htim2;   /* PWM  – STEP signal on PA5 (TIM2_CH1) */
 extern TIM_HandleTypeDef htim5;   /* Encoder – reads actual position        */
 
 /* ── Machine travel limits (in encoder counts) ── */
-#define LIMIT_UPPER   1250u
-#define LIMIT_LOWER   0u
+#define LIMIT_UPPER   15000
+#define LIMIT_LOWER   0
 
 /* ── Conversion: encoder counts per millimetre ── */
 #define COUNTS_PER_MM  23.66f
 
 /* ── Return codes ── */
 typedef enum {
-    MOVE_OK              = 0,
-    MOVE_ERR_UPPER_LIMIT = 1,   /* Target would exceed upper hard limit */
-    MOVE_ERR_LOWER_LIMIT = 2,   /* Target would exceed lower hard limit */
-    MOVE_ERR_INVALID     = 3    /* Zero mm, already at limit, etc.      */
+    IDLE_STATE,
+	MOVE_OK,
+    MOVE_ERR_UPPER_LIMIT,   /* Target would exceed upper hard limit */
+    MOVE_ERR_LOWER_LIMIT,   /* Target would exceed lower hard limit */
+    MOVE_ERR_INVALID    	/* Zero mm, already at limit, etc.      */
 } MoveResult;
 
 //Function to be called in the main.c
