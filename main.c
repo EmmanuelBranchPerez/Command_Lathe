@@ -25,6 +25,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "stepper.h" //Stepper's header file
+#include "uart_dma.h"
 
 /* USER CODE END Includes */
 
@@ -52,9 +53,10 @@ UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
-int32_t act_counter = 0;
-int8_t once = 0;
+int32_t act_counter = 0; // declare as a global variable to evaluate its behavior at the SFR
+int8_t once = 0; // check again...
 MoveResult result = IDLE_STATE;
+UartPacket pkt; // Declare the type variable so we can have the packet set
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -109,7 +111,7 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM5_Init();
   /* USER CODE BEGIN 2 */
-
+  uart_dma_init(&huart2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -118,32 +120,35 @@ int main(void)
 
 	while (1)
 	{
-		if(once){
-			result = MoveSteps(100);     /* move +25 mm forward  */
-		}
-
-		switch (result) {
-
-			case IDLE_STATE:
-			    printf("IDLE_STATE \r\n");
-			    break;
-		    case MOVE_OK:
-		    	once = 0;
-		        printf("Move complete.\r\n");
-		        result = IDLE_STATE;
-		        break;
-		    case MOVE_ERR_UPPER_LIMIT:
-		    	once = 0;
-		        printf("ERROR: Upper limit reached. Reconfigure position.\r\n");
-		        break;
-		    case MOVE_ERR_LOWER_LIMIT:
-		    	once = 0;
-		        printf("ERROR: Lower limit reached. Reconfigure position.\r\n");
-		        break;
-		    case MOVE_ERR_INVALID:
-		    	once = 0;
-		        printf("ERROR: Invalid movement (0 mm).\r\n");
-		        break;
+//		if(once){
+//			result = MoveSteps(100);     /* move +25 mm forward  */
+//		}
+//
+//		switch (result) {
+//
+//			case IDLE_STATE:
+//			    printf("IDLE_STATE \r\n");
+//			    break;
+//		    case MOVE_OK:
+//		    	once = 0;
+//		        printf("Move complete.\r\n");
+//		        result = IDLE_STATE;
+//		        break;
+//		    case MOVE_ERR_UPPER_LIMIT:
+//		    	once = 0;
+//		        printf("ERROR: Upper limit reached. Reconfigure position.\r\n");
+//		        break;
+//		    case MOVE_ERR_LOWER_LIMIT:
+//		    	once = 0;
+//		        printf("ERROR: Lower limit reached. Reconfigure position.\r\n");
+//		        break;
+//		    case MOVE_ERR_INVALID:
+//		    	once = 0;
+//		        printf("ERROR: Invalid movement (0 mm).\r\n");
+//		        break;
+//		}
+		if(uart_dma_get_packet(&pkt)){
+			HAL_UART_Transmit(&huart2, pkt.buffer, pkt.size, 100);
 		}
     /* USER CODE END WHILE */
 
