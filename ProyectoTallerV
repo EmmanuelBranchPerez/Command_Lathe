@@ -1,1 +1,41 @@
-Proyecto Taller V: Mini Command Lathe.
+● ---
+  Command Lathe — Project Status
+  Branch: command_lathe1.1
+  Date: 2026-05-14
+
+  ---
+  Hardware target: STM32F411RE Nucleo-64
+  Peripherals in use: TIM2 (A4988 PWM step pulse), TIM5 (encoder feedback), USART2 PA2/PA3 (serial CLI), DMA1 Stream5 (UART RX), DMA1 Stream6 (UART TX)
+
+  ---
+  Layer 1 — UART DMA Reception: COMPLETE ✓
+  
+  Implemented ping-pong DMA buffering using HAL_UARTEx_ReceiveToIdle_DMA with two 64-byte buffers (rx_buffer_a, rx_buffer_b). The ISR swaps the active buffer on
+  each idle event and exposes the completed packet via a volatile UartPacket sentinel. Verified with echo test: ISR fires exactly once per packet, correct byte
+  counts confirmed across multiple transmissions.
+
+  Key decisions:
+  - uart_dma_tx() removed — it relied on strlen(), which requires null termination. Raw DMA buffers are not null-terminated. HAL_UART_Transmit with explicit
+  pkt.size is used instead. 
+  - printf not used — __io_putchar in syscalls.c is a weak symbol with no implementation. Debug output uses snprintf + HAL_UART_Transmit.
+  - MoveSteps test loop is commented out in main.c, preserved for Layer 3 integration.
+
+  ---
+  Layer 2 — Command Parser: PENDING
+  
+  Will receive a raw UartPacket and return a parsed integer value (distance/position). Deliberately decoupled from stepper.c — the parser returns data only; the
+  caller decides what to do with it.
+
+  ---
+  Layer 3 — UART CLI State Machine: PENDING
+
+  Will manage the full interaction loop: prompt → receive → parse → move → repeat.
+
+  ---
+  Modules removed from this branch:
+  - lcd_display.c/.h — preserved on main, not part of CLI-first milestone
+  - mpu6000.c/.h — preserved on main, not part of CLI-first milestone
+
+  This Branch ended at the UART DMA implementetion 
+--- ●
+

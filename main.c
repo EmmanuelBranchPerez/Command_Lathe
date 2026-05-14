@@ -116,7 +116,7 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  once = 1;
+  //once = 1;
 
 	while (1)
 	{
